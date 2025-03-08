@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use client_sdk::helpers::risc0::Risc0Prover;
-use contract::Counter;
-use contract::CounterAction;
+use contract::Meetup;
+use contract::MeetupAction;
 use sdk::api::APIRegisterContract;
 use sdk::BlobTransaction;
 use sdk::ProofTransaction;
@@ -29,7 +29,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     RegisterContract {},
-    Increment {},
+    PostRoot {},
 }
 
 #[tokio::main]
@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::RegisterContract {} => {
             // Build initial state of contract
-            let initial_state = Counter { value: 0 };
+            let initial_state = Meetup { merkle_roots: Vec::new() };
 
             // Send the transaction to register the contract
             let res = client
@@ -62,9 +62,9 @@ async fn main() -> Result<()> {
                 .await?;
             println!("✅ Register contract tx sent. Tx hash: {}", res);
         }
-        Commands::Increment {} => {
+        Commands::PostRoot {} => {
             // Fetch the initial state from the node
-            let mut initial_state: Counter = client
+            let mut initial_state: Meetup = client
                 .get_contract(&contract_name.clone().into())
                 .await
                 .unwrap()
@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
             // ----
             // Build the blob transaction
             // ----
-            let action = CounterAction::Increment {};
+            let action = MeetupAction::PostRoot {};
             let blobs = vec![action.as_blob(contract_name)];
             let blob_tx = BlobTransaction::new(identity.clone(), blobs.clone());
 
