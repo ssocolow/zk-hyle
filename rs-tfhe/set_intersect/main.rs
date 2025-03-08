@@ -147,6 +147,11 @@ fn server(enc_xi: Vec<Ciphertext>, cone : Vec<Ciphertext>, czero : Vec<Ciphertex
   return test_equal2;
 }
 
+// fn client(vec_x : Vec<u8>, i: u8, secret_key: &SecretKey) -> (Vec<Ciphertext>, rt) {
+//   return (uint_to_cipher(vec_x[i], &secret_key), merkle(vec_x));
+// }
+// this is almost pseudo-code
+
 fn main() {
   let secret_key = SecretKey::new();
   let cloud_key = CloudKey::new(&secret_key);
