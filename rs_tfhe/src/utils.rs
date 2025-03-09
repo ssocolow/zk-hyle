@@ -1,6 +1,7 @@
 use crate::params::Torus;
 use crate::tlwe;
 use rand_distr::Distribution;
+use rand::prelude::*;
 
 pub type Ciphertext = tlwe::TLWELv0;
 
@@ -59,7 +60,7 @@ mod tests {
   #[test]
   fn test_gussian_32bit() {
     let normal = Normal::new(0.0, 0.1).unwrap();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let torus = gussian_torus_vec(&vec![12], &normal, &mut rng);
     assert_eq!(torus.len(), 1);
 

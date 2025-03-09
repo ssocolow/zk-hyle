@@ -1,4 +1,5 @@
 use crate::spqlios;
+use rand::prelude::*;
 
 pub struct FFTPlan {
   pub spqlios: spqlios::Spqlios,
@@ -24,9 +25,9 @@ mod tests {
   fn test_spqlios_fft_ifft() {
     let n = 1024;
     let mut plan = FFTPlan::new(n);
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut a: Vec<u32> = vec![0u32; n];
-    a.iter_mut().for_each(|e| *e = rng.gen::<u32>());
+    a.iter_mut().for_each(|e| *e = rng.random::<u32>());
 
     let a_fft = plan.spqlios.ifft(&a);
     let res = plan.spqlios.fft(&a_fft);
@@ -41,12 +42,12 @@ mod tests {
   fn test_spqlios_poly_mul() {
     let n = 1024;
     let mut plan = FFTPlan::new(n);
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut a: Vec<u32> = vec![0u32; n];
     let mut b: Vec<u32> = vec![0u32; n];
-    a.iter_mut().for_each(|e| *e = rng.gen::<u32>());
+    a.iter_mut().for_each(|e| *e = rng.random::<u32>());
     b.iter_mut()
-      .for_each(|e| *e = rng.gen::<u32>() % params::trgsw_lv1::BG as u32);
+      .for_each(|e| *e = rng.random::<u32>() % params::trgsw_lv1::BG as u32);
 
     let spqlios_res = plan.spqlios.poly_mul(&a, &b);
     let res = poly_mul(&a.to_vec(), &b.to_vec());
@@ -59,9 +60,9 @@ mod tests {
   #[test]
   fn test_spqlios_fft_ifft_1024() {
     let mut plan = FFTPlan::new(1024);
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut a = [0u32; 1024];
-    a.iter_mut().for_each(|e| *e = rng.gen::<u32>());
+    a.iter_mut().for_each(|e| *e = rng.random::<u32>());
 
     let a_fft = plan.spqlios.ifft_1024(&a);
     let res = plan.spqlios.fft_1024(&a_fft);
@@ -74,13 +75,13 @@ mod tests {
   #[test]
   fn test_spqlios_poly_mul_1024() {
     let mut plan = FFTPlan::new(1024);
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     for _i in 0..100 {
       let mut a = [0u32; 1024];
       let mut b = [0u32; 1024];
-      a.iter_mut().for_each(|e| *e = rng.gen::<u32>());
+      a.iter_mut().for_each(|e| *e = rng.random::<u32>());
       b.iter_mut()
-        .for_each(|e| *e = rng.gen::<u32>() % params::trgsw_lv1::BG as u32);
+        .for_each(|e| *e = rng.random::<u32>() % params::trgsw_lv1::BG as u32);
 
       let spqlios_res = plan.spqlios.poly_mul_1024(&a, &b);
       let res = poly_mul(&a.to_vec(), &b.to_vec());
