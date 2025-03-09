@@ -5,6 +5,7 @@ use crate::trgsw::{blind_rotate, identity_key_switching};
 use crate::trlwe::{sample_extract_index, sample_extract_index_2};
 use crate::utils;
 use crate::utils::Ciphertext;
+use rand::prelude::*;
 
 //let mut fft_plan = FFTPlan::new(1024);
 
@@ -350,14 +351,14 @@ mod tests {
     actual: C,
   ) {
     const N: usize = params::trgsw_lv1::N;
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let key = key::SecretKey::new();
     let cloud_key = key::CloudKey::new(&key);
 
     let try_num = 10;
     for _i in 0..try_num {
-      let plain_a = rng.gen::<bool>();
-      let plain_b = rng.gen::<bool>();
+      let plain_a = rng.random::<bool>();
+      let plain_b = rng.random::<bool>();
       let expected = expect(plain_a, plain_b);
 
       let tlwe_a = Ciphertext::encrypt_bool(plain_a, params::tlwe_lv0::ALPHA, &key.key_lv0);
@@ -374,15 +375,15 @@ mod tests {
 
   #[test]
   fn test_mux() {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let key = key::SecretKey::new();
     let cloud_key = key::CloudKey::new(&key);
 
     let try_num = 10;
     for _i in 0..try_num {
-      let plain_a = rng.gen::<bool>();
-      let plain_b = rng.gen::<bool>();
-      let plain_c = rng.gen::<bool>();
+      let plain_a = rng.random::<bool>();
+      let plain_b = rng.random::<bool>();
+      let plain_c = rng.random::<bool>();
       let expected = (plain_a & plain_b) | ((!plain_a) & plain_c);
 
       let tlwe_a = Ciphertext::encrypt_bool(plain_a, params::tlwe_lv0::ALPHA, &key.key_lv0);
@@ -403,7 +404,7 @@ mod tests {
   #[test]
   fn test_hom_nand_bench() {
       const N: usize = params::trgsw_lv1::N;
-      let mut rng = rand::thread_rng();
+      let mut rng = rand::rng();
       let mut plan = mulfft::FFTPlan::new(N);
       let key = key::SecretKey::new();
       let cloud_key = key::CloudKey::new(&key, &mut plan);
@@ -419,8 +420,8 @@ mod tests {
       }
 
       let try_num = 100;
-      let plain_a = rng.gen::<bool>();
-      let plain_b = rng.gen::<bool>();
+      let plain_a = rng.random::<bool>();
+      let plain_b = rng.random::<bool>();
       let nand = !(plain_a & plain_b);
 
       let tlwe_a = Ciphertext::encrypt_bool(plain_a, params::tlwe_lv0::ALPHA, &key.key_lv0);

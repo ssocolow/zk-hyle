@@ -1,7 +1,8 @@
 use crate::key;
 use crate::params;
 use crate::utils;
-use rand::Rng;
+// use rand::Rng;
+use rand::prelude::*;
 use std::iter::Iterator;
 use std::ops::{Add, Mul, Neg, Sub};
 
@@ -26,18 +27,18 @@ impl TLWELv0 {
   }
 
   pub fn encrypt_f64(p: f64, alpha: f64, key: &key::SecretKeyLv0) -> TLWELv0 {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut tlwe = TLWELv0::new();
     let mut inner_product: u32 = 0;
 
     for i in 0..key.len() {
-      let rand_u32: u32 = rng.gen();
+      let rand_u32: u32 = rng.random();
       inner_product = inner_product.wrapping_add(key[i] * rand_u32);
       tlwe.p[i] = rand_u32;
     }
 
     let normal_distr = rand_distr::Normal::new(0.0, alpha).unwrap();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let b = utils::gaussian_f64(p, &normal_distr, &mut rng);
     *tlwe.b_mut() = inner_product.wrapping_add(b);
     tlwe
@@ -163,16 +164,16 @@ impl TLWELv1 {
 
   #[cfg(test)]
   pub fn encrypt_f64(p: f64, alpha: f64, key: &key::SecretKeyLv1) -> TLWELv1 {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut tlwe = TLWELv1::new();
     let mut inner_product: u32 = 0;
     for i in 0..key.len() {
-      let rand_u32: u32 = rng.gen();
+      let rand_u32: u32 = rng.random();
       inner_product = inner_product.wrapping_add(key[i] * rand_u32);
       tlwe.p[i] = rand_u32;
     }
     let normal_distr = rand_distr::Normal::new(0.0, alpha).unwrap();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let b = utils::gaussian_f64(p, &normal_distr, &mut rng);
     *tlwe.b_mut() = inner_product.wrapping_add(b);
     tlwe
@@ -204,7 +205,7 @@ mod tests {
 
   #[test]
   fn test_tlwe_enc_and_dec() {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let key = key::SecretKey::new();
     let key_dirty = key::SecretKey::new();
@@ -213,7 +214,7 @@ mod tests {
     let try_num = 10000;
 
     for _i in 0..try_num {
-      let sample = rng.gen::<bool>();
+      let sample = rng.random::<bool>();
       let secret = TLWELv0::encrypt_bool(sample, params::tlwe_lv0::ALPHA, &key.key_lv0);
       let plain = secret.decrypt_bool(&key.key_lv0);
       let plain_dirty = secret.decrypt_bool(&key_dirty.key_lv0);

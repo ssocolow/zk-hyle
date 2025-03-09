@@ -3,7 +3,8 @@ use crate::tlwe;
 use crate::trgsw;
 use crate::trlwe;
 use crate::utils;
-use rand::Rng;
+// use rand::Rng;
+use rand::prelude::*;
 
 const TRGSWLV1_N: usize = params::trgsw_lv1::N;
 const TRGSWLV1_IKS_T: usize = params::trgsw_lv1::IKS_T;
@@ -21,7 +22,7 @@ pub struct SecretKey {
 
 impl SecretKey {
   pub fn new() -> Self {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut key = SecretKey {
       key_lv0: [0u32; params::tlwe_lv0::N],
       key_lv1: [0u32; params::tlwe_lv1::N],
@@ -29,11 +30,11 @@ impl SecretKey {
     key
       .key_lv0
       .iter_mut()
-      .for_each(|e| *e = rng.gen::<bool>() as u32);
+      .for_each(|e| *e = rng.random::<bool>() as u32);
     key
       .key_lv1
       .iter_mut()
-      .for_each(|e| *e = rng.gen::<bool>() as u32);
+      .for_each(|e| *e = rng.random::<bool>() as u32);
     key
   }
 }
