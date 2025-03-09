@@ -14,14 +14,12 @@ impl HyleContract for Meetup {
         // Execute the contract logic
         match action {
             MeetupAction::PostRoot => {
-                // Hash the private input
-                let mut hasher = Sha256::new();
-                hasher.update(&contract_input.private_input);
-                let result = hasher.finalize();
-
-                // convert to string
-                let ans : Vec<u128> = vec![1, 3, 4, 5, 1, 3, 4, 9]; // sample input for now
-                let hash = Meetup::create_merkle_tree(&ans);
+                // interest1, interest2, interest3, ...
+                let data = core::str::from_utf8(&contract_input.private_input).unwrap();
+                let numbers: Vec<u128> = data.split(" ").map(|x| x.parse().unwrap()).collect();
+                
+                // create hash
+                let hash = Meetup::create_merkle_tree(&numbers);
                 self.merkle_roots.push(hash);
             }
             MeetupAction::AddEncryption => {
@@ -97,8 +95,9 @@ impl Meetup {
 
     fn create_merkle_tree(values: &Vec<u128>) -> u128 {
         // Check if input size is a power of 2
-        if !values.len().is_power_of_two() {
-            panic!("Input size must be a power of 2");
+        let mut values = values.clone();
+        while !values.len().is_power_of_two() {
+            values.push(0);
         }
 
         // Convert values to u128 hashes for leaf nodes
