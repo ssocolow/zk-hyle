@@ -7,14 +7,12 @@ use std::collections::HashMap;
 use crate::api;
 use awc::Client;
 
+const HYLE_BLOCKCHAIN_SERVER: &str = "http://localhost:4321";
 const HYLE_BLOCKCHAIN_URL: &str = "http://localhost:4321/v1";
 
 #[derive(Debug, Deserialize)]
 struct RegisterContractRequest {
     contract_name: String,
-    program_id: Vec<i32>,
-    state_digest: Vec<i32>,
-    verifier: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,25 +43,8 @@ struct HashedInterestsData {
 async fn register_contract(req: web::Json<RegisterContractRequest>) -> impl Responder {
     println!("Received data: {:?}", req);
     
-    match api::register_contract(&req.host, &req.contract_name).await {
+    match api::register_contract(HYLE_BLOCKCHAIN_SERVER, &req.contract_name).await {
         Ok(tx_hash) => {
-            // Make POST request to blockchain after successful registration
-            let client = Client::default();
-            let response = client.post("http://localhost:4321/v1/contract/register")
-                .insert_header(("accept", "application/json"))
-                .insert_header(("Content-Type", "application/json"))
-                .send_json(&serde_json::json!({
-                    "contract_name": &req.contract_name,
-                    "program_id": [12],
-                    "state_digest": [10], 
-                    "verifier": "string"
-                }))
-                .await;
-
-            if let Err(e) = response {
-                println!("Failed to send to blockchain: {}", e);
-            }
-
             // Return original tx_hash regardless of POST result
             HttpResponse::Ok().json(serde_json::json!({ "tx_hash": tx_hash }))
         },
