@@ -8,6 +8,9 @@ use crate::api;
 use awc::Client;
 use actix_cors::Cors;
 use actix_web::{middleware};
+use sdk::{BlobIndex, ContractInput};
+use contract::{Meetup, MeetupAction};
+use methods::GUEST_ELF;
 
 const HYLE_BLOCKCHAIN_SERVER: &str = "http://localhost:4321";
 const HYLE_BLOCKCHAIN_URL: &str = "http://localhost:4321/v1";
@@ -21,7 +24,7 @@ struct RegisterContractRequest {
 struct PostRootRequest {
     host: String,
     contract_name: String,
-    interests: String,
+    answers: Vec<AnsweredQuestions>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -54,14 +57,22 @@ async fn register_contract(req: web::Json<RegisterContractRequest>) -> impl Resp
 async fn post_root(req: web::Json<PostRootRequest>) -> impl Responder {
     println!("Received root data: {:?}", req);
 
+    let alice_interests_vec: Vec<u128> = req.answers.iter().map(
+        |x| x.id * 5 + x.answerId
+    ).collect();
+    let alice_interests_string = alice_interests_vec.iter().map(
+        |x| x.to_string()
+    ).collect::<Vec<String>>().join(" ");
+    
+    // Can also publish Bob's merkle root
     let BOB_INTERESTS = vec![
         AnsweredQuestions{ id: 0, answerId: 1 },
         AnsweredQuestions{ id: 1, answerId: 4 },
         AnsweredQuestions{ id: 2, answerId: 2 },
         AnsweredQuestions{ id: 3, answerId: 3 },
     ];
-
-    match api::post_root(&req.host, &req.contract_name, req.interests.clone()).await {
+    
+    match api::post_root(&req.host, &req.contract_name, alice_interests_string).await {
         Ok(tx_hash) => HttpResponse::Ok().json(serde_json::json!({ "tx_hash": tx_hash })),
         Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
     }
