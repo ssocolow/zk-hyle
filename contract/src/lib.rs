@@ -17,7 +17,7 @@ impl HyleContract for Meetup {
                 // interest1, interest2, interest3, ...
                 let data = core::str::from_utf8(&contract_input.private_input).unwrap();
                 let numbers: Vec<u128> = data.split(" ").map(|x| x.parse().unwrap()).collect();
-                
+
                 // create hash
                 let hash = Meetup::create_merkle_tree(&numbers);
                 self.merkle_roots.push(hash);
@@ -32,7 +32,8 @@ impl HyleContract for Meetup {
 
                 let p: u128 = numbers[0];
                 let q: u128 = numbers[1];
-                let encrypted_messages: Vec<u128> = numbers.iter().map(|msg| Meetup::encrypt(p, q, *msg)).collect();
+                let (pk, sk) = Meetup::prepare_key(p, q);
+                let encrypted_messages: Vec<u128> = numbers.iter().map(|msg| Meetup::encrypt(*msg, pk)).collect();
                 let encrypted_messages_str = encrypted_messages.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(" ");
                 hasher.update(encrypted_messages_str.as_bytes());
                 let result = hasher.finalize();
@@ -48,50 +49,66 @@ impl HyleContract for Meetup {
 }
 
 impl Meetup {
-    fn mod_pow(mut base: u128, mut exp: u128, modulus: u128) -> u128 {
-        if modulus == 1 { return 0 }
+    // Helper for Encryption
+    fn l_function(x: u128, n: u128) -> u128 {
+        (x - 1) / n
+    }
+
+    fn mod_inv(a: u128, m: u128) -> u128 {
+        let (g, x, _) = Self::extended_gcd(a as i128, m as i128);
+        if g == 1 {
+            ((x % m as i128 + m as i128) % m as i128) as u128
+        } else {
+            panic!("No modular inverse exists!");
+        }
+    }
+
+    fn extended_gcd(a: i128, b: i128) -> (i128, i128, i128) {
+        if a == 0 {
+            return (b, 0, 1);
+        }
+        let (g, x1, y1) = Self::extended_gcd(b % a, a);
+        let x = y1 - (b / a) * x1;
+        let y = x1;
+        (g, x, y)
+    }
+
+    fn mod_exp(mut base: u128, mut exp: u128, modulus: u128) -> u128 {
         let mut result = 1;
         base = base % modulus;
         while exp > 0 {
             if exp % 2 == 1 {
-                result = result * base % modulus;
+                result = (result * base) % modulus;
             }
             exp = exp >> 1;
-            base = base * base % modulus
+            base = (base * base) % modulus;
         }
         result
     }
-    
-    fn encrypt(p: u128, q: u128, msg: u128) -> u128 {
-        // paillier encryption
-        // let p: u128 = 13;
-        // let q: u128 = 23;
 
-        let n: u128 = p * q;
-        // let lambda: u128 = (p - 1) * (q - 1);
-        let g: u128 = n + 1;
-        // let mu = Meetup::mod_inverse(n, lambda);
+    // paillier
+    fn prepare_key (p: u128, q: u128) -> ([u128; 2], [u128; 3]) {
+        let n = p * q;
+        let lambda = num_integer::lcm(p - 1, q - 1);
+        let g = n + 1; // Standard choice for g
+        let mu = Self::mod_inv(Self::l_function(Self::mod_exp(g, lambda, n * n), n), n);
 
-        // get message
-        let r: u128 = 5;
-        let mut c = Self::mod_pow(g, msg, n.pow(2));
-        c *= Self::mod_pow(r, n, n.pow(2));
-        c % n.pow(2)
+        ([n, g], [n, lambda, mu])
     }
 
-    /*
-    fn mod_inverse (n: u128, p: u128) -> u128{
-        // Checks numbers from 1 to p-1
-        for x in 1..p {
-            if (n * x) % p == 1 {
-                return x;
-            }
-        }
-
-        // Returns 0 if no Modular Multiplicative Inverse exist
-        return 0;
+    fn encrypt(m: u128, pk: [u128; 2]) -> u128 {
+        let [n, g] = pk;
+        let n_sq = n * n;
+        let r = 3; // Fixed r for simplicity (should be random < n)
+        (Self::mod_exp(g, m, n_sq) * Self::mod_exp(r, n, n_sq)) % n_sq
     }
-    */
+
+    fn decrypt(c: u128, sk: [u128; 3]) -> u128 {
+        let [n, lambda, mu] = sk;
+        let n_sq = n * n;
+        let l_value = Self::l_function(Self::mod_exp(c, lambda, n_sq), n);
+        (l_value * mu) % n
+    }
 
     fn create_merkle_tree(values: &Vec<u128>) -> u128 {
         // Check if input size is a power of 2
