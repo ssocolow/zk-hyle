@@ -14,7 +14,10 @@ pub async fn register_contract(
     contract_name: &str,
 ) -> Result<String> {
     let client = NodeApiHttpClient::new(host.to_string())?;
-    let initial_state = Meetup { merkle_roots: Vec::new() };
+    let initial_state = Meetup {
+        merkle_roots: Vec::new(),
+        encrypted_message_hash: String::new(),
+    };
 
     let res = client.register_contract(
         &sdk::api::APIRegisterContract {
