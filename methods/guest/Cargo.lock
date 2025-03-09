@@ -309,6 +309,7 @@ version = "0.1.0"
 dependencies = [
  "borsh",
  "hyle-contract-sdk",
+ "num-integer",
  "serde",
  "sha2",
 ]

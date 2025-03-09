@@ -24,21 +24,17 @@ struct PostRootRequest {
     interests: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct HashedInterestsRequest {
-    address: String,
-    m1: String,
-    m2: String,
-    m3: String,
-    m4: String,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct AnsweredQuestions {
+    id: u128,
+    answerId: u128,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct HashedInterestsData {
-    m1: String,
-    m2: String,
-    m3: String,
-    m4: String,
+#[derive(Debug, Deserialize)]
+struct InterestsRequest {
+    meetCode: String,
+    address: String,
+    answers: Vec<AnsweredQuestions>,
 }
 
 #[post("/register-contract")]
@@ -57,31 +53,47 @@ async fn register_contract(req: web::Json<RegisterContractRequest>) -> impl Resp
 #[post("/post-root")]
 async fn post_root(req: web::Json<PostRootRequest>) -> impl Responder {
     println!("Received root data: {:?}", req);
-    
+
+    let BOB_INTERESTS = vec![
+        AnsweredQuestions{ id: 0, answerId: 1 },
+        AnsweredQuestions{ id: 1, answerId: 4 },
+        AnsweredQuestions{ id: 2, answerId: 2 },
+        AnsweredQuestions{ id: 3, answerId: 3 },
+    ];
+
     match api::post_root(&req.host, &req.contract_name, req.interests.clone()).await {
         Ok(tx_hash) => HttpResponse::Ok().json(serde_json::json!({ "tx_hash": tx_hash })),
         Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
     }
 }
 
-#[post("/receive-hashed-interests")]
-async fn receive_hashed_interests(req: web::Json<HashedInterestsRequest>) -> impl Responder {
-    println!("Received hashed interests: {:?}", req);
+#[post("/receive-interests")]
+async fn receive_interests(req: web::Json<InterestsRequest>) -> impl Responder {
+    println!("Received interests: {:?}", req);
 
-    // Read existing data or create new HashMap if file doesn't exist
-    let mut hashed_interests: HashMap<String, HashedInterestsData> = match fs::read_to_string("hashed-interests.json") {
-        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
-        Err(_) => HashMap::new(),
-    };
+    let BOB_INTERESTS = vec![
+        AnsweredQuestions{ id: 0, answerId: 1 },
+        AnsweredQuestions{ id: 1, answerId: 4 },
+        AnsweredQuestions{ id: 2, answerId: 2 },
+        AnsweredQuestions{ id: 3, answerId: 3 },
+    ];
 
-    // Update the hashed interests for this address
-    hashed_interests.insert(req.address.clone(), HashedInterestsData {
-        m1: req.m1.clone(),
-        m2: req.m2.clone(),
-        m3: req.m3.clone(),
-        m4: req.m4.clone(),
-    });
 
+    let bob_interests_vec: Vec<u128> = BOB_INTERESTS.iter().map(
+        |x| x.id * 5 + x.answerId
+    ).collect();
+    let alice_interests_vec: Vec<u128> = req.answers.iter().map(
+        |x| x.id * 5 + x.answerId
+    ).collect();
+
+    let (pk, sk) = prepare_key(7759, 6983);
+    let alice_interests_vec_enc = alice_interests_vec.iter().map(
+        |x| encrypt(*x, pk)
+    ).collect();
+
+    let result = server_code_batch(bob_interests_vec, alice_interests_vec_enc, pk);
+
+    /*
     // Save back to file
     match serde_json::to_string_pretty(&hashed_interests) {
         Ok(json_str) => {
@@ -97,9 +109,17 @@ async fn receive_hashed_interests(req: web::Json<HashedInterestsRequest>) -> imp
             }));
         }
     }
+    */
 
+    let intersection_numbers = client_find_intersection(result, sk);
+    let mut intersection = Vec::new();
+    for i in 0..intersection_numbers.len() {
+        if intersection_numbers[i] {
+            intersection.push(BOB_INTERESTS[i].clone());
+        }
+    }
     HttpResponse::Ok().json(serde_json::json!({
-        "message": "Hashed interests saved successfully"
+        "intersection": intersection,
     }))
 }
 
@@ -115,6 +135,91 @@ async fn receive_hashed_interests(req: web::Json<HashedInterestsRequest>) -> imp
 //     .run()
 //     .await
 // }
+fn server_code_batch(y_secret: Vec<u128>, c_x: Vec<u128>, pk: [u128; 2]) -> Vec<u128> {
+    let mut result : Vec<u128> = Vec::new();
+    assert!(y_secret.len() == c_x.len());
+    let m = c_x.len();
+    for i in 0..m {
+        let c_y = encrypt(y_secret[i], pk);
+        let c_y_inv = invert_cipher(c_y, pk[0]);
+        result.push((c_x[i] * c_y_inv) % (pk[0] * pk[0]));
+    }
+    result
+}
+
+fn invert_cipher(c: u128, n: u128) -> u128 {
+    let n_sq = n * n;
+    mod_exp(c, n - 1, n_sq)
+}
+
+fn l_function(x: u128, n: u128) -> u128 {
+    (x - 1) / n
+}
+
+fn mod_inv(a: u128, m: u128) -> u128 {
+    let (g, x, _) = extended_gcd(a as i128, m as i128);
+    if g == 1 {
+        ((x % m as i128 + m as i128) % m as i128) as u128
+    } else {
+        panic!("No modular inverse exists!");
+    }
+}
+
+fn extended_gcd(a: i128, b: i128) -> (i128, i128, i128) {
+    if a == 0 {
+        return (b, 0, 1);
+    }
+    let (g, x1, y1) = extended_gcd(b % a, a);
+    let x = y1 - (b / a) * x1;
+    let y = x1;
+    (g, x, y)
+}
+
+fn mod_exp(mut base: u128, mut exp: u128, modulus: u128) -> u128 {
+    let mut result = 1;
+    base = base % modulus;
+    while exp > 0 {
+        if exp % 2 == 1 {
+            result = (result * base) % modulus;
+        }
+        exp = exp >> 1;
+        base = (base * base) % modulus;
+    }
+    result
+}
+
+// paillier
+fn prepare_key (p: u128, q: u128) -> ([u128; 2], [u128; 3]) {
+    let n = p * q;
+    let lambda = num_integer::lcm(p - 1, q - 1);
+    let g = n + 1; // Standard choice for g
+    let mu = mod_inv(l_function(mod_exp(g, lambda, n * n), n), n);
+
+    ([n, g], [n, lambda, mu])
+}
+
+fn encrypt(m: u128, pk: [u128; 2]) -> u128 {
+    let [n, g] = pk;
+    let n_sq = n * n;
+    let r = 3; // Fixed r for simplicity (should be random < n)
+    (mod_exp(g, m, n_sq) * mod_exp(r, n, n_sq)) % n_sq
+}
+
+fn decrypt(c: u128, sk: [u128; 3]) -> u128 {
+    let [n, lambda, mu] = sk;
+    let n_sq = n * n;
+    let l_value = l_function(mod_exp(c, lambda, n_sq), n);
+    (l_value * mu) % n
+}
+
+fn client_find_intersection(c_y: Vec<u128>, sk: [u128; 3]) -> Vec<bool> {
+    let mut result : Vec<bool> = Vec::new();
+    for c in c_y{
+        result.push(decrypt(c, sk) == 0);
+    }
+    result
+}
+
 pub async fn run_server() -> std::io::Result<()> {
     println!("Starting HTTP server on 127.0.0.1:8080");
     HttpServer::new(|| {
@@ -133,7 +238,7 @@ pub async fn run_server() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .service(register_contract)
             .service(post_root)
-            .service(receive_hashed_interests)
+            .service(receive_interests)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
