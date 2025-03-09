@@ -1,8 +1,11 @@
+// host/src/main.rs
+
+use actix_web::{post, web, HttpResponse, Responder};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
 
-mod api; // This module contains your core functions
+mod api;
 mod http_server;
 
 #[derive(Parser)]
@@ -26,10 +29,44 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    RegisterContract {},
-    PostRoot {
-        interests: String,
-    },
+  RegisterContract {},
+  /// Post a root and prove a state transition; interests are passed as a string.
+  PostRoot {
+      interests: String,
+  },
+}
+
+#[derive(Deserialize)]
+struct RegisterContractRequest {
+    host: String,
+    contract_name: String,
+}
+
+#[derive(Deserialize)]
+struct PostRootRequest {
+    host: String,
+    contract_name: String,
+    interests: String,
+}
+
+#[post("/register-contract")]
+async fn register_contract_endpoint(
+  req: web::Json<RegisterContractRequest>,
+) -> impl Responder {
+  match api::register_contract(&req.host, &req.contract_name).await {
+    Ok(tx_hash) => HttpResponse::Ok().json(serde_json::json!({ "tx_hash": tx_hash })),
+    Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+  }
+}
+
+#[post("/post-root")]
+async fn post_root_endpoint(
+  req: web::Json<PostRootRequest>,
+) -> impl Responder {
+  match api::post_root(&req.host, &req.contract_name, req.interests.clone()).await {
+    Ok(tx_hash) => HttpResponse::Ok().json(serde_json::json!({ "tx_hash": tx_hash })),
+    Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+  }
 }
 
 #[tokio::main]
@@ -39,73 +76,17 @@ async fn main() -> Result<()> {
   if cli.cli {
     // Run CLI mode.
     match cli.command {
-        Commands::RegisterContract {} => {
-            // Build initial state of contract
-            let initial_state = Meetup { merkle_roots: Vec::new() };
-
-            // Send the transaction to register the contract
-            let res = client
-                .register_contract(&APIRegisterContract {
-                    verifier: "risc0".into(),
-                    program_id: sdk::ProgramId(sdk::to_u8_array(&GUEST_ID).to_vec()),
-                    state_digest: initial_state.as_digest(),
-                    contract_name: contract_name.clone().into(),
-                })
-                .await?;
-            println!("✅ Register contract tx sent. Tx hash: {}", res);
-        }
-        Commands::PostRoot { interests } => {
-            // Fetch the initial state from the node
-            let mut initial_state: Meetup = client
-                .get_contract(&contract_name.clone().into())
-                .await
-                .unwrap()
-                .state
-                .into();
-
-            // ----
-            // Build the blob transaction
-            // ----
-            let action = MeetupAction::PostRoot {};
-            let blobs = vec![action.as_blob(contract_name)];
-            let blob_tx = BlobTransaction::new(identity.clone(), blobs.clone());
-
-            // Send the blob transaction
-            let blob_tx_hash = client.send_tx_blob(&blob_tx).await.unwrap();
-            println!("✅ Blob tx sent. Tx hash: {}", blob_tx_hash);
-
-            // ----
-            // Prove the state transition
-            // ----
-
-            // Build the contract input
-            let inputs = ContractInput {
-                state: initial_state.as_bytes().unwrap(),
-                identity: identity.clone().into(),
-                tx_hash: blob_tx_hash,
-                private_input: interests.as_bytes().to_vec(),
-                tx_ctx: None,
-                blobs: blobs.clone(),
-                index: sdk::BlobIndex(0),
-            };
-
-            let (program_outputs, _, _) = initial_state.execute(&inputs).unwrap();
-            println!("🚀 Executed: {}", program_outputs);
-
-            // Generate the zk proof
-            let proof = prover.prove(inputs).await.unwrap();
-
-            // Build the Proof transaction
-            let proof_tx = ProofTransaction {
-                proof,
-                contract_name: contract_name.clone().into(),
-            };
-
-            // Send the proof transaction
-            let proof_tx_hash = client.send_tx_proof(&proof_tx).await.unwrap();
-            println!("✅ Proof tx sent. Tx hash: {}", proof_tx_hash);
-        }
->>>>>>> 06831a8fea2fe146b3d7f53c28e26b85bacb8faf
+      Some(Commands::RegisterContract {}) => {
+        let tx_hash = api::register_contract(&cli.host, &cli.contract_name).await?;
+        println!("✅ Register contract tx sent. Tx hash: {}", tx_hash);
+      }
+      Some(Commands::PostRoot { interests }) => {
+        let tx_hash = api::post_root(&cli.host, &cli.contract_name, interests).await?;
+        println!("✅ Proof tx sent. Tx hash: {}", tx_hash);
+      }
+      None => {
+        println!("No CLI command provided.");
+      }
     }
   } else {
     // Default: Run HTTP server mode.

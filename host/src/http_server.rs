@@ -5,7 +5,6 @@ use anyhow::Result;
 use serde::Deserialize;
 use crate::api;
 
-
 #[derive(Deserialize)]
 struct RegisterContractRequest {
     host: String,
@@ -16,6 +15,7 @@ struct RegisterContractRequest {
 struct PostRootRequest {
     host: String,
     contract_name: String,
+    interests: String,
 }
 
 #[post("/register-contract")]
@@ -28,13 +28,14 @@ async fn register_contract(req: web::Json<RegisterContractRequest>) -> impl Resp
 
 #[post("/post-root")]
 async fn post_root(req: web::Json<PostRootRequest>) -> impl Responder {
-    match api::post_root(&req.host, &req.contract_name).await {
+    match api::post_root(&req.host, &req.contract_name, req.interests.clone()).await {
         Ok(tx_hash) => HttpResponse::Ok().json(serde_json::json!({ "tx_hash": tx_hash })),
         Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
     }
 }
 
 pub async fn run_server() -> std::io::Result<()> {
+    println!("Starting HTTP server on 127.0.0.1:8080");
     HttpServer::new(|| {
         App::new()
             .service(register_contract)
