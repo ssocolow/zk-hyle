@@ -2,6 +2,7 @@ use borsh::{io::Error, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use sdk::{Digestable, HyleContract, RunResult};
+use sha2::{Digest, Sha256};
 
 
 impl HyleContract for Meetup {
@@ -10,9 +11,22 @@ impl HyleContract for Meetup {
         // Parse contract inputs
         let (action, ctx) = sdk::utils::parse_raw_contract_input::<MeetupAction>(contract_input)?;
 
+        // let interests = core::str::from_utf8(&contract_input.private_input).unwrap();
+        // let interests_u8: Vec<u8> = interests.split(" ").map(|x| x.parse().unwrap()).collect();
+
+
         // Execute the contract logic
         match action {
-            MeetupAction::PostRoot => self.merkle_roots.push("new_root".to_string()),
+            MeetupAction::PostRoot => {
+                // Hash the private input
+                let mut hasher = Sha256::new();
+                hasher.update(&contract_input.private_input);
+                let result = hasher.finalize();
+
+                // convert to string
+                let hash = format!("{:x}", result);
+                self.merkle_roots.push(hash);
+            }
         }
 
         // program_output might be used to give feedback to the user
@@ -30,7 +44,7 @@ pub enum MeetupAction {
 /// The state of the contract, in this example it is fully serialized on-chain
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug, Clone)]
 pub struct Meetup {
-    pub merkle_roots: Vec<String>
+    pub merkle_roots: Vec<String>,
 }
 
 /// Utils function for the host
