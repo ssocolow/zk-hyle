@@ -6,6 +6,8 @@ use std::fs;
 use std::collections::HashMap;
 use crate::api;
 use awc::Client;
+use actix_cors::Cors;
+use actix_web::{middleware};
 
 const HYLE_BLOCKCHAIN_SERVER: &str = "http://localhost:4321";
 const HYLE_BLOCKCHAIN_URL: &str = "http://localhost:4321/v1";
@@ -101,10 +103,34 @@ async fn receive_hashed_interests(req: web::Json<HashedInterestsRequest>) -> imp
     }))
 }
 
+// pub async fn run_server() -> std::io::Result<()> {
+//     println!("Starting HTTP server on 127.0.0.1:8080");
+//     HttpServer::new(|| {
+//         App::new()
+//             .service(register_contract)
+//             .service(post_root)
+//             .service(receive_hashed_interests)
+//     })
+//     .bind(("127.0.0.1", 8080))?
+//     .run()
+//     .await
+// }
 pub async fn run_server() -> std::io::Result<()> {
     println!("Starting HTTP server on 127.0.0.1:8080");
     HttpServer::new(|| {
+        // Configure CORS middleware
+        let cors = Cors::default()
+            .allow_any_origin() // Change to your allowed domain
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+            .allowed_headers(vec![
+                actix_web::http::header::CONTENT_TYPE,
+                actix_web::http::header::AUTHORIZATION,
+            ])
+            .supports_credentials();
+        
         App::new()
+            .wrap(cors)
+            .wrap(middleware::Logger::default())
             .service(register_contract)
             .service(post_root)
             .service(receive_hashed_interests)
