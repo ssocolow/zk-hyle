@@ -29,7 +29,9 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     RegisterContract {},
-    PostRoot {},
+    PostRoot {
+        interests: String,
+    },
 }
 
 #[tokio::main]
@@ -62,7 +64,7 @@ async fn main() -> Result<()> {
                 .await?;
             println!("✅ Register contract tx sent. Tx hash: {}", res);
         }
-        Commands::PostRoot {} => {
+        Commands::PostRoot { interests } => {
             // Fetch the initial state from the node
             let mut initial_state: Meetup = client
                 .get_contract(&contract_name.clone().into())
@@ -91,7 +93,7 @@ async fn main() -> Result<()> {
                 state: initial_state.as_bytes().unwrap(),
                 identity: identity.clone().into(),
                 tx_hash: blob_tx_hash,
-                private_input: vec![],
+                private_input: interests.as_bytes().to_vec(),
                 tx_ctx: None,
                 blobs: blobs.clone(),
                 index: sdk::BlobIndex(0),

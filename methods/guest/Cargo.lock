@@ -310,6 +310,7 @@ dependencies = [
  "borsh",
  "hyle-contract-sdk",
  "serde",
+ "sha2",
 ]
 
 [[package]]
