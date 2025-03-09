@@ -85,3 +85,66 @@ pub async fn post_root(
 
     Ok(proof_tx_hash.to_string())
 }
+
+pub async fn post_enc(
+    host: &str,
+    contract_name: &str,
+    p: u128,
+    q: u128,
+    interests: String,
+) -> Result<String> {
+    // Initialize the client and identity.
+    let client = NodeApiHttpClient::new(host.to_string())?;
+    let identity = format!("none.{}", contract_name);
+
+    // Fetch the initial state from the node.
+    let mut initial_state: Meetup = client
+        .get_contract(&contract_name.into())
+        .await?
+        .state
+        .into();
+
+    // ---- Build and send the blob transaction ----
+    let action = MeetupAction::AddEncryption {};
+    let blobs = vec![action.as_blob(contract_name)];
+    let blob_tx = BlobTransaction::new(identity.clone(), blobs.clone());
+    let blob_tx_hash = client.send_tx_blob(&blob_tx).await?;
+    println!("✅ Blob tx sent. Tx hash: {}", blob_tx_hash);
+
+    // ---- Prove the state transition ----
+    let mut private_input = p.to_string();
+    private_input.push_str(" ");
+    private_input.push_str(q.to_string().as_str());
+    private_input.push_str(" ");
+    private_input.push_str(interests.as_str());
+
+    let inputs = ContractInput {
+        state: initial_state.as_bytes()?,
+        identity: identity.clone().into(),
+        tx_hash: blob_tx_hash.clone(),
+        private_input: private_input.as_bytes().to_vec(),
+        tx_ctx: None,
+        blobs: blobs.clone(),
+        index: BlobIndex(0),
+    };
+
+    let (program_outputs, _, _) = initial_state
+        .execute(&inputs)
+        .map_err(|e| anyhow::anyhow!(e))?;
+    println!("🚀 Executed: {}", program_outputs);
+
+    // Create the prover and generate the proof.
+    let prover = Risc0Prover::new(GUEST_ELF);
+    let proof = prover.prove(inputs).await?;
+
+    // Build and send the proof transaction.
+    let proof_tx = ProofTransaction {
+        proof,
+        contract_name: contract_name.into(),
+    };
+
+    let proof_tx_hash = client.send_tx_proof(&proof_tx).await?;
+    println!("✅ Proof tx sent. Tx hash: {}", proof_tx_hash);
+
+    Ok(proof_tx_hash.to_string())
+}

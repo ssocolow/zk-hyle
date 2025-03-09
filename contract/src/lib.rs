@@ -43,8 +43,8 @@ impl HyleContract for Meetup {
         }
 
         // program_output might be used to give feedback to the user
-        let program_output = format!("new value: {}", self.merkle_roots[0]);
-        Ok((program_output, ctx, vec![]))
+        //let program_output = format!("new value: {}", self.merkle_roots[0]);
+        Ok(("".to_string(), ctx, vec![]))
     }
 }
 
