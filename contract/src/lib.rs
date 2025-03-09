@@ -93,6 +93,76 @@ impl Meetup {
         return 0;
     }
     */
+
+    fn create_merkle_tree(values: Vec<u128>) -> u128 {
+        // Check if input size is a power of 2
+        if !values.len().is_power_of_two() {
+            panic!("Input size must be a power of 2");
+        }
+
+        // Convert values to u128 hashes for leaf nodes
+        let mut current_level: Vec<u128> = values
+            .iter()
+            .map(|&x| {
+                let mut hasher = Sha256::new();
+                hasher.update(x.to_string().as_bytes());
+                let result = hasher.finalize();
+                // Take first 16 bytes and convert to u128
+                let bytes: [u8; 16] = result[..16].try_into().unwrap();
+                u128::from_be_bytes(bytes)
+            })
+            .collect();
+
+        // Build the tree bottom-up
+        while current_level.len() > 1 {
+            let mut next_level = Vec::new();
+            
+            // Process pairs of nodes
+            for chunk in current_level.chunks(2) {
+                let mut hasher = Sha256::new();
+                // Hash both numbers together
+                hasher.update(&chunk[0].to_be_bytes());
+                hasher.update(&chunk[1].to_be_bytes());
+                let result = hasher.finalize();
+                // Take first 16 bytes and convert to u128
+                let bytes: [u8; 16] = result[..16].try_into().unwrap();
+                next_level.push(u128::from_be_bytes(bytes));
+            }
+            
+            current_level = next_level;
+        }
+
+        // Return root hash as u128
+        current_level[0]
+    }
+
+    // Updated verification function to work with u128 hashes
+    // fn verify_merkle_proof(root: u128, value: u128, proof: &[u128], index: usize) -> bool {
+    //     let mut hasher = Sha256::new();
+    //     hasher.update(value.to_string().as_bytes());
+    //     let result = hasher.finalize();
+    //     let bytes: [u8; 16] = result[..16].try_into().unwrap();
+    //     let mut current_hash = u128::from_be_bytes(bytes);
+
+    //     for (i, &proof_element) in proof.iter().enumerate() {
+    //         let mut hasher = Sha256::new();
+            
+    //         // Calculate position in the tree to determine hash order
+    //         if (index >> i) & 1 == 0 {
+    //             hasher.update(&current_hash.to_be_bytes());
+    //             hasher.update(&proof_element.to_be_bytes());
+    //         } else {
+    //             hasher.update(&proof_element.to_be_bytes());
+    //             hasher.update(&current_hash.to_be_bytes());
+    //         }
+            
+    //         let result = hasher.finalize();
+    //         let bytes: [u8; 16] = result[..16].try_into().unwrap();
+    //         current_hash = u128::from_be_bytes(bytes);
+    //     }
+
+    //     current_hash == root
+    // }
 }
 
 /// The action represents the different operations that can be done on the contract
