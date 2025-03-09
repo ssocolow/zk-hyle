@@ -89,8 +89,32 @@ def send_hashed_interests():
         
         print(f"Received root data: {data}")  # Debug print
 
-        # Return the response from the Hyle server
-        return jsonify(response.json()), response.status_code
+        # Load existing hashed interests from file
+        try:
+            with open('hashed-interests.json', 'r') as f:
+                hashed_interests = json.load(f)
+        except FileNotFoundError:
+            hashed_interests = {}  # Changed to empty dict
+
+        # Initialize the address key if it doesn't exist
+        if data["address"] not in hashed_interests:
+            hashed_interests[data["address"]] = {}
+
+        # Append new hashed interests to the user data
+        if "m1" in data and "m2" in data and "m3" in data and "m4" in data:
+            hashed_interests[data["address"]].update({
+                "m1": data["m1"],
+                "m2": data["m2"], 
+                "m3": data["m3"],
+                "m4": data["m4"]
+            })
+        
+        # Save updated hashed interests back to file
+        with open('hashed-interests.json', 'w') as f:
+            json.dump(hashed_interests, f, indent=4)
+
+        # Added success response
+        return jsonify({"message": "Hashed interests saved successfully"}), 200
     
     except json.JSONDecodeError as e:
         return jsonify({"error": f"Invalid JSON format: {str(e)}"}), 400
