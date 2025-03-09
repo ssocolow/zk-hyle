@@ -6,6 +6,11 @@ use std::fs;
 use std::collections::HashMap;
 use crate::api;
 use awc::Client;
+use actix_cors::Cors;
+use actix_web::{middleware};
+use sdk::{BlobIndex, ContractInput};
+use contract::{Meetup, MeetupAction};
+use methods::GUEST_ELF;
 
 const HYLE_BLOCKCHAIN_SERVER: &str = "http://localhost:4321";
 const HYLE_BLOCKCHAIN_URL: &str = "http://localhost:4321/v1";
@@ -19,7 +24,7 @@ struct RegisterContractRequest {
 struct PostRootRequest {
     host: String,
     contract_name: String,
-    interests: String,
+    answers: Vec<AnsweredQuestions>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,14 +57,22 @@ async fn register_contract(req: web::Json<RegisterContractRequest>) -> impl Resp
 async fn post_root(req: web::Json<PostRootRequest>) -> impl Responder {
     println!("Received root data: {:?}", req);
 
+    let alice_interests_vec: Vec<u128> = req.answers.iter().map(
+        |x| x.id * 5 + x.answerId
+    ).collect();
+    let alice_interests_string = alice_interests_vec.iter().map(
+        |x| x.to_string()
+    ).collect::<Vec<String>>().join(" ");
+    
+    // Can also publish Bob's merkle root
     let BOB_INTERESTS = vec![
         AnsweredQuestions{ id: 0, answerId: 1 },
         AnsweredQuestions{ id: 1, answerId: 4 },
         AnsweredQuestions{ id: 2, answerId: 2 },
         AnsweredQuestions{ id: 3, answerId: 3 },
     ];
-
-    match api::post_root(&req.host, &req.contract_name, req.interests.clone()).await {
+    
+    match api::post_root(&req.host, &req.contract_name, alice_interests_string).await {
         Ok(tx_hash) => HttpResponse::Ok().json(serde_json::json!({ "tx_hash": tx_hash })),
         Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
     }
@@ -121,6 +134,18 @@ async fn receive_interests(req: web::Json<InterestsRequest>) -> impl Responder {
     }))
 }
 
+// pub async fn run_server() -> std::io::Result<()> {
+//     println!("Starting HTTP server on 127.0.0.1:8080");
+//     HttpServer::new(|| {
+//         App::new()
+//             .service(register_contract)
+//             .service(post_root)
+//             .service(receive_hashed_interests)
+//     })
+//     .bind(("127.0.0.1", 8080))?
+//     .run()
+//     .await
+// }
 fn server_code_batch(y_secret: Vec<u128>, c_x: Vec<u128>, pk: [u128; 2]) -> Vec<u128> {
     let mut result : Vec<u128> = Vec::new();
     assert!(y_secret.len() == c_x.len());
@@ -209,7 +234,19 @@ fn client_find_intersection(c_y: Vec<u128>, sk: [u128; 3]) -> Vec<bool> {
 pub async fn run_server() -> std::io::Result<()> {
     println!("Starting HTTP server on 127.0.0.1:8080");
     HttpServer::new(|| {
+        // Configure CORS middleware
+        let cors = Cors::default()
+            .allow_any_origin() // Change to your allowed domain
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+            .allowed_headers(vec![
+                actix_web::http::header::CONTENT_TYPE,
+                actix_web::http::header::AUTHORIZATION,
+            ])
+            .supports_credentials();
+        
         App::new()
+            .wrap(cors)
+            .wrap(middleware::Logger::default())
             .service(register_contract)
             .service(post_root)
             .service(receive_interests)
