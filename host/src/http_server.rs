@@ -96,8 +96,13 @@ async fn receive_interests(req: web::Json<InterestsRequest>) -> impl Responder {
     let alice_interests_vec: Vec<u128> = req.answers.iter().map(
         |x| x.id * 5 + x.answerId
     ).collect();
+    let alice_interests_string = alice_interests_vec.iter().map(
+        |x| x.to_string()
+    ).collect::<Vec<String>>().join(" ");
 
-    let (pk, sk) = prepare_key(7759, 6983);
+    let p = 7759;
+    let q = 6983;
+    let (pk, sk) = prepare_key(p, q);
     let alice_interests_vec_enc = alice_interests_vec.iter().map(
         |x| encrypt(*x, pk)
     ).collect();
@@ -129,9 +134,20 @@ async fn receive_interests(req: web::Json<InterestsRequest>) -> impl Responder {
             intersection.push(BOB_INTERESTS[i].clone());
         }
     }
-    HttpResponse::Ok().json(serde_json::json!({
-        "intersection": intersection,
-    }))
+    match api::post_enc(
+        HYLE_BLOCKCHAIN_SERVER,
+        "test4",
+        p,
+        q,
+        alice_interests_string,
+    ).await {
+        Ok(tx_hash) =>
+            HttpResponse::Ok().json(serde_json::json!({
+            "intersection": intersection,
+            "tx_hash": tx_hash,
+        })),
+        Err(err) => return HttpResponse::InternalServerError().body(err.to_string()),
+    }
 }
 
 // pub async fn run_server() -> std::io::Result<()> {
